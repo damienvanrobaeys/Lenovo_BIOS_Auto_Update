@@ -8,19 +8,33 @@ $LZ4_DLL = ""
 # Delay for BIOS update - if BIOS release is older than the delay, it will continue the process
 $BIOS_Delay_Days = 90
 
-# Chemin du warning user sur le blog storage
-$BIOS_Warning_URL = ""
 
 ##################################################################################################
 # 									Variables to fill
 ##################################################################################################
+
+Function Kill_Existing_GUI
+{
+	$OD_Process_Status = (gwmi win32_process | Where {$_.commandline -like "*Warning_BIOS*"})				
+	$OD_Process_Status2 = get-process | where {$_.MainWindowTitle -like "*Mise à jour de votre poste de travail*"}				
+
+	If($OD_Process_Status -ne $null)
+		{
+			$OD_Process_Status.Terminate()
+		}
+
+	If($OD_Process_Status2 -ne $null)
+		{
+			$OD_Process_Status2 | kill		
+		}	
+}	
 
 
 $WMI_computersystem = gwmi win32_computersystem
 $Manufacturer = $WMI_computersystem.manufacturer
 If($Manufacturer -ne "LENOVO")
 	{
-		write-output "Manufacturer is not Lenovo"	
+		write-output "Poste non Lenovo"	
 		EXIT 0	
 	}
 Else
@@ -29,7 +43,7 @@ Else
 		$Script:process = get-process logonui -ea silentlycontinue
 		If($currentuser -and $process)
 			{							
-				write-output "Computer is locked"	
+				write-output "Ordinateur verrouillé"	
 				EXIT 0
 			}
 		Else
@@ -38,7 +52,6 @@ Else
 				$DLL_Download_Success = $False
 				If(!(test-path $LZ4_DLL_Path))
 					{
-						# $LZ4_DLL = "https://stagrtdwpprddevices.blob.core.windows.net/biosmgmt/LZ4.dll"
 						Try
 							{
 								Invoke-WebRequest -Uri $LZ4_DLL -OutFile "$LZ4_DLL_Path" 	
@@ -46,7 +59,7 @@ Else
 							}
 						Catch
 							{
-								write-output "Ca not download DLL LZ4"
+								write-output "Impossible de télécharger la DLL LZ4"
 								EXIT 0
 							}	
 					}
@@ -197,6 +210,9 @@ Else
 											
 						If($Model_Found -eq $True)
 							{
+								# Si le warning est déjà ouvert, on le ferme pour afficher le nouveau
+								Kill_Existing_GUI		
+								
 								$Get_GUID = $Search_Model.Guid 
 								$wbrsp 	= $RunspaceScopeVendor.GetModelWebResponse("$Get_GUID")
 								$OSCatalog = $RunspaceScopeVendor.GetAllSupportedOS($wbrsp) 
@@ -214,29 +230,30 @@ Else
 								$BIOS_Update_File_Name = "BIOSUpdate_$Get_Current_Model_$Get_New_BIOS_Version"
 								$BIOS_Update_Path = "$env:temp\$BIOS_Update_File_Name"
 								$BIOS_Update_Folder = "$env:temp\BIOSUpdate_$Get_Current_Model_MTM"
-								If(test-path $BIOS_Update_Folder){Remove-item $BIOS_Update_Folder -Force -Recurse}
+								# If(test-path $BIOS_Update_Folder){Remove-item $BIOS_Update_Folder -Force -Recurse}
 								new-item $BIOS_Update_Folder -Force -Type Directory | out-null
 								$Get_New_BIOS_URL | out-file "$BIOS_Update_Folder\BIOS_URL_$Get_Current_Model_MTM.txt"
 
 								If($Get_Current_BIOS_Version -lt $Get_New_BIOS_Version)
 									{
+										write-output "Nouveau: $Get_New_BIOS_Version ($Get_Current_Model_FamilyName)"
 										$Get_Current_Date = get-date
 										$Diff_LastBIOS_and_Today = $Get_Current_Date - $Get_Converted_BIOS_Date
 										$Diff_in_days = $Diff_LastBIOS_and_Today.Days
-										If($Diff_in_days -gt $BIOS_Delay_Days)
+										If(($Diff_in_days) -gt $BIOS_Delay_Days)
 											{		
-												write-output "($Get_Current_Model_FamilyName) Older than 180 jours ($Diff_in_days)"
+												write-output "Plus de 90 jours ($Diff_in_days)"
 												EXIT 1
 											}
 										Else
 											{		
-												write-output "($Get_Current_Model_FamilyName) BIOS date Less than 180 jours ($Diff_in_days)"
-												EXIT 0
-											}																					
+												write-output "Moins de 90 jours ($Diff_in_days)"
+												EXIT 0												
+											}													
 									}
 								Else
 									{
-										write-output "No new version -  Current version: $Get_Current_BIOS_Version ($Get_Current_Model_FamilyName)"
+										write-output "Pas de nouvelle version - Version actuelle: $Get_Current_BIOS_Version ($Get_Current_Model_FamilyName)"
 										EXIT 0
 									}			
 							}	
