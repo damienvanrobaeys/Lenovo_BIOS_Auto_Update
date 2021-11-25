@@ -2,12 +2,13 @@
 # 									Variables to fill
 ##################################################################################################
 
-# Blog storage path of LZ4 DLL
-$LZ4_DLL = ""
+# Path of LZ4 DLL
+# You can copy it on a blog storage and download it from there or download it from my GitHub
+# $LZ4_DLL = "copy blo storage path"
+$LZ4_DLL = "https://github.com/damienvanrobaeys/Intune-Proactive-Remediation-scripts/blob/main/Compare%20Lenovo%20BIOS%20version/LZ4.dll"
 
-# Delay for BIOS update - if BIOS release is older than the delay, it will continue the process
+# Delay for BIOS update - if BIOS release is x days older than the delay, it will continue the process
 $BIOS_Delay_Days = 90
-
 
 ##################################################################################################
 # 									Variables to fill
@@ -30,20 +31,32 @@ Function Kill_Existing_GUI
 }	
 
 
+$Current_User_Profile = Get-ChildItem Registry::\HKEY_USERS | Where-Object { Test-Path "$($_.pspath)\Volatile Environment" } | ForEach-Object { (Get-ItemProperty "$($_.pspath)\Volatile Environment").USERPROFILE }
+$Username = $Current_User_Profile.split("\")[2]		
+
 $WMI_computersystem = gwmi win32_computersystem
 $Manufacturer = $WMI_computersystem.manufacturer
+
+$BIOS_Version = gwmi win32_bios
+$BIOS_Maj_Version = $BIOS_Version.SystemBiosMajorVersion 
+$BIOS_Min_Version = $BIOS_Version.SystemBiosMinorVersion 
+$Get_Current_BIOS_Version = "$BIOS_Maj_Version.$BIOS_Min_Version"
+
 If($Manufacturer -ne "LENOVO")
 	{
-		write-output "Poste non Lenovo"	
+		write-output "Manufacturer is not Lenovo"	
 		EXIT 0	
 	}
 Else
 	{	
+		$Get_Current_Model_MTM = ($WMI_computersystem.Model).Substring(0,4)
+		$Get_Current_Model_FamilyName = $WMI_computersystem.SystemFamily.split(" ")[1]			
 		$Script:currentuser = $WMI_computersystem | select -ExpandProperty username
-		$Script:process = get-process logonui -ea silentlycontinue
+		$Script:process = get-process logonui -ea silentlycontinue			
+	
 		If($currentuser -and $process)
 			{							
-				write-output "Ordinateur verrouillé"	
+				write-output "Device is locked"	
 				EXIT 0
 			}
 		Else
@@ -59,7 +72,7 @@ Else
 							}
 						Catch
 							{
-								write-output "Impossible de télécharger la DLL LZ4"
+								write-output "Can not download LZ4 DLL"
 								EXIT 0
 							}	
 					}
@@ -179,14 +192,7 @@ Else
 						}
 
 						$Model_Found = $False
-						$Get_Current_Model_MTM = ((gwmi win32_computersystem).Model).Substring(0,4)
-						$Get_Current_Model_FamilyName = (gwmi win32_computersystem).SystemFamily.split(" ")[1]
-						$BIOS_Version = gwmi win32_bios
-						$BIOS_Maj_Version = $BIOS_Version.SystemBiosMajorVersion 
-						$BIOS_Min_Version = $BIOS_Version.SystemBiosMinorVersion 
-						$Get_Current_BIOS_Version = "$BIOS_Maj_Version.$BIOS_Min_Version"
-						$RunspaceScopeVendor = [Lenovo]::new()
-						
+						$RunspaceScopeVendor = [Lenovo]::new()						
 						$Search_Model = $RunspaceScopeVendor.FindModel("$Get_Current_Model_MTM")
 						$Get_GUID = $Search_Model.Guid 
 						If($Get_GUID -eq $null)
@@ -195,7 +201,7 @@ Else
 								$Get_GUID = $Search_Model.Guid 				
 								If($Get_GUID -eq $null)
 									{
-										write-output "Modèle introuvable ou problème de vérification"	
+										write-output "Model not found or issue with ckecking"	
 										EXIT 0
 									}		
 								Else
@@ -210,7 +216,7 @@ Else
 											
 						If($Model_Found -eq $True)
 							{
-								# Si le warning est déjà ouvert, on le ferme pour afficher le nouveau
+								# If the warning is already opened, we will close it to display it again
 								Kill_Existing_GUI		
 								
 								$Get_GUID = $Search_Model.Guid 
@@ -220,9 +226,20 @@ Else
 								$DriversModelDatasForOsType = [Array]($DriversModeldatas | Where-Object {($_.OperatingSystemKeys -contains 'Windows 10 (64-bit)' )} )
 
 								$Get_BIOS_Update = $DriversModelDatasForOsType | Where {($_.Title -like "*BIOS Update*")}
-								$Get_BIOS_Update = $Get_BIOS_Update.files  | Where {$_.Type -eq "EXE"}
-								$Get_New_BIOS_Version = $Get_BIOS_Update.version
-														
+								$Get_BIOS_Update = $Get_BIOS_Update.files  | Where {$_.Type -eq "EXE"}								
+								If($Get_BIOS_Update.Count -gt 1)
+									{
+										$Get_BIOS_Update = $Get_BIOS_Update[-1]
+									}
+								
+								$Get_New_BIOS_Version = $Get_BIOS_Update.version														
+								$Get_New_BIOS_Date = $Get_BIOS_Update.Date
+								
+								If($Get_New_BIOS_Version -like "*/*")
+									{
+										$Get_New_BIOS_Version = $Get_New_BIOS_Version.Split("/")[0]
+									}									
+	
 								$Get_New_BIOS_URL = $Get_BIOS_Update.URL
 								$Get_New_BIOS_Date = $Get_BIOS_Update.Date
 								$Get_Converted_BIOS_Date = [Datetime]::ParseExact($Get_New_BIOS_Date, 'MM/dd/yyyy', $null)							
@@ -230,7 +247,6 @@ Else
 								$BIOS_Update_File_Name = "BIOSUpdate_$Get_Current_Model_$Get_New_BIOS_Version"
 								$BIOS_Update_Path = "$env:temp\$BIOS_Update_File_Name"
 								$BIOS_Update_Folder = "$env:temp\BIOSUpdate_$Get_Current_Model_MTM"
-								# If(test-path $BIOS_Update_Folder){Remove-item $BIOS_Update_Folder -Force -Recurse}
 								new-item $BIOS_Update_Folder -Force -Type Directory | out-null
 								$Get_New_BIOS_URL | out-file "$BIOS_Update_Folder\BIOS_URL_$Get_Current_Model_MTM.txt"
 
@@ -242,18 +258,18 @@ Else
 										$Diff_in_days = $Diff_LastBIOS_and_Today.Days
 										If(($Diff_in_days) -gt $BIOS_Delay_Days)
 											{		
-												write-output "Plus de 90 jours ($Diff_in_days)"
+												write-output "More than 90 days ($Diff_in_days)"
 												EXIT 1
 											}
 										Else
 											{		
-												write-output "Moins de 90 jours ($Diff_in_days)"
+												write-output "Less than 90 days ($Diff_in_days)"
 												EXIT 0												
 											}													
 									}
 								Else
 									{
-										write-output "Pas de nouvelle version - Version actuelle: $Get_Current_BIOS_Version ($Get_Current_Model_FamilyName)"
+										write-output "Now new version available - Current version: $Get_Current_BIOS_Version ($Get_Current_Model_FamilyName)"
 										EXIT 0
 									}			
 							}	
