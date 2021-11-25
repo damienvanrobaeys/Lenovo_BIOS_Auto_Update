@@ -2,7 +2,7 @@
 # 									Variables to fill
 ##################################################################################################
 
-# Blog storage path of WPF warning
+# Blog storage path containing the WPF warning
 $BIOS_Warning_URL = ""
 
 ##################################################################################################
@@ -16,11 +16,9 @@ $BIOS_Update_EXE = "$BIOS_Update_Folder\$BIOS_Update_File_Name.exe"
 $Get_New_BIOS_URL = "$BIOS_Update_Folder\BIOS_URL_$Get_Current_Model.txt"
 $User_Continue_Process_File = "$BIOS_Update_Folder\BIOS_Update_Continue.txt"
 $WPF_Warning_Export_Folder = "$BIOS_Update_Folder\WPF_Warning"
-# $WPF_Warning_ZIP_File = "$BIOS_Update_Folder\BIOS_Update_Warning.zip"
-$WPF_Warning_ZIP_File = "$BIOS_Update_Folder\BIOS_Update_Warning2.zip"
+$WPF_Warning_ZIP_File = "$BIOS_Update_Folder\BIOS_Update_Warning.zip"	
 	
-	
-# Variable de sécurité	
+# Security variables
 $BIOS_Update_Downloaded = $False
 $BIOS_EXE_Extracted = $False
 $Suspend_Bitlocker_Success = $False
@@ -42,15 +40,15 @@ Function Write_Log
 		write-host  "$MyDate - $Message_Type : $Message"		
 	}
 
-# On teste si l'URL de l'update BIOS est disponible
+# Check if BIOS uodte URL is available on the device (provided by the detection script)
 If(!(test-path $Get_New_BIOS_URL))
 	{
-		Write_Log -Message_Type "ERROR" -Message "Fichier introuvable: $Get_New_BIOS_URL"	
+		Write_Log -Message_Type "ERROR" -Message "File not found: $Get_New_BIOS_URL"	
 		Break
 	}
 
 
-# On télécharge le warning WPF pour l'utilisateur sur le blob storage
+# Download the WPF warning for the user from the blob storage
 Try
 	{
 		Invoke-WebRequest -Uri $BIOS_Warning_URL -OutFile $WPF_Warning_ZIP_File 	
@@ -58,11 +56,11 @@ Try
 	}
 Catch
 	{
-		write-output "Erreur de téléchargement du warning"
+		write-output "Issue while downlading WPF warning"
 		EXIT 1
 	}	
 	
-# Si le warning WPF a été téléchargé, alors on extrait le contenu du ZIP	
+# If the WPF warning has been successfully downloaded, we will extract it
 If($Warning_GUI_Downloaded -eq $True)
 	{
 		If(!(test-path $WPF_Warning_Export_Folder)){new-item $WPF_Warning_Export_Folder -Force -Type Directory}	
@@ -73,12 +71,12 @@ If($Warning_GUI_Downloaded -eq $True)
 			}
 		Catch
 			{
-				write-output "Erreur pendant l'extraction du warning"
+				write-output "Issue while extracting warning"
 				EXIT 1
 			}
 	}
 
-# Si le ZIP du warning WPF a été extrait, on télécharge la nouvelle version du BIOS sous format EXE
+# If warning has been successfully extracted, we download the new BIOS version as EXE
 If($Warning_ZIP_Extracted -eq $True)
 	{	
 		Try
@@ -86,34 +84,33 @@ If($Warning_ZIP_Extracted -eq $True)
 				$Get_New_BIOS_URL = Get-Content "$BIOS_Update_Folder\BIOS_URL_$Get_Current_Model.txt"	
 				Invoke-WebRequest -Uri $Get_New_BIOS_URL -OutFile $BIOS_Update_EXE
 				$BIOS_Update_Downloaded = $True
-				Write_Log -Message_Type "INFO" -Message "Téléchargement du nouveau BIOS"	
-				Write_Log -Message_Type "SUCCESS" -Message "Téléchargement du nouveau BIOS"												
+				Write_Log -Message_Type "INFO" -Message "Downloading BIOS"	
+				Write_Log -Message_Type "SUCCESS" -Message "Downloading BIOS"												
 			}
 		Catch
 			{
-				write-output "Téléchargement impossible de l'update BIOS"
-				Write_Log -Message_Type "ERROR" -Message "Téléchargement du nouveau BIOS"																		
+				write-output "Can not download the BIOS update"
+				Write_Log -Message_Type "ERROR" -Message "Downloading BIOS"																		
 				EXIT 1
 			}
 
-		# Si l'EXE de l'update BIOS a été téléchargé, on en extrait le contenu
+		# If BIOS EXE has been downloaded successfully, we will extract content
 		If($BIOS_Update_Downloaded -eq $True)
 			{
-				Write_Log -Message_Type "INFO" -Message "Extraction du nouveau BIOS"			
+				Write_Log -Message_Type "INFO" -Message "Extracting BIOS"			
 				$BIOS_Update_FileName = (Get-item $BIOS_Update_EXE).BaseName
 				$Extract_Folder_Name = "$BIOS_Update_FileName" + "_$Get_Current_Model"
-				# $Extract_Folder_Path = "$BIOS_Update_Folder\$BIOS_Extract_Folder_Name"
 				$Extract_Folder_Path = "$BIOS_Update_Folder\BIOS_Extract"
 				Try
 					{
 						Start-Process -FilePath ("$BIOS_Update_EXE") -ArgumentList "/VERYSILENT /DIR=$Extract_Folder_Path /EXTRACT=YES" -PassThru -Wait					
 						$BIOS_EXE_Extracted = $True
-						Write_Log -Message_Type "SUCCESS" -Message "Extraction du nouveau BIOS"																
+						Write_Log -Message_Type "SUCCESS" -Message "Extracting BIOS"																
 					}
 				Catch
 					{
-						write-output "Erreur pendant l'extraction de l'update BIOS"							
-						Write_Log -Message_Type "ERROR" -Message "Extraction du nouveau BIOS"
+						write-output "Issue while extracting BIOS update"							
+						Write_Log -Message_Type "ERROR" -Message "Extracting BIOS"
 						EXIT 1
 					}
 			}	
@@ -124,6 +121,7 @@ If($Warning_ZIP_Extracted -eq $True)
 If(($BIOS_EXE_Extracted -eq $True) -and ($Warning_GUI_Downloaded -eq $True) -and ($Warning_ZIP_Extracted -eq $True) -and ($BIOS_Update_Downloaded -eq $True))
 	{				
 		# On affiche le warning WPF 
+		# Display warning to user
 		Write_Log -Message_Type "ERROR" -Message "Affichage de l'interface utilisateur"
 		& "$WPF_Warning_Export_Folder\ServiceUI.exe" -process:explorer.exe C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe " -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File $WPF_Warning_Export_Folder\Warning_BIOS.ps1"								
 	}
