@@ -51,7 +51,7 @@ If(!(test-path $Get_New_BIOS_URL))
 # Download the WPF warning for the user from the blob storage
 Try
 	{
-		Invoke-WebRequest -Uri $BIOS_Warning_URL -OutFile $WPF_Warning_ZIP_File 	
+		Invoke-WebRequest -Uri $BIOS_Warning_URL -OutFile $WPF_Warning_ZIP_File -UseBasicParsing 	
 		$Warning_GUI_Downloaded = $True	
 	}
 Catch
@@ -82,7 +82,7 @@ If($Warning_ZIP_Extracted -eq $True)
 		Try
 			{
 				$Get_New_BIOS_URL = Get-Content "$BIOS_Update_Folder\BIOS_URL_$Get_Current_Model.txt"	
-				Invoke-WebRequest -Uri $Get_New_BIOS_URL -OutFile $BIOS_Update_EXE
+				Invoke-WebRequest -Uri $Get_New_BIOS_URL -OutFile $BIOS_Update_EXE -UseBasicParsing
 				$BIOS_Update_Downloaded = $True
 				Write_Log -Message_Type "INFO" -Message "Downloading BIOS"	
 				Write_Log -Message_Type "SUCCESS" -Message "Downloading BIOS"												
