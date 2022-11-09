@@ -67,7 +67,7 @@ Else
 					{
 						Try
 							{
-								Invoke-WebRequest -Uri $LZ4_DLL -OutFile "$LZ4_DLL_Path" 	
+								Invoke-WebRequest -Uri $LZ4_DLL -OutFile "$LZ4_DLL_Path" -UseBasicParsing	
 								$DLL_Download_Success = $True		
 							}
 						Catch
@@ -107,7 +107,7 @@ Else
 
 							Static hidden [Object[]] GetDevicesCatalog()
 							{
-								$result = Invoke-WebRequest -Uri "https://pcsupport.lenovo.com/us/en/api/v4/mse/getAllProducts?productId=" -Headers @{
+								$result = Invoke-WebRequest -Uri "https://pcsupport.lenovo.com/us/en/api/v4/mse/getAllProducts?productId=" -UseBasicParsing -Headers @{
 								"Accept"="application/json, text/javascript, */*; q=0.01"
 								  "Referer"="https://pcsupport.lenovo.com/us/en/"
 								  "X-CSRF-Token"="2yukcKMb1CvgPuIK9t04C6"
@@ -141,7 +141,7 @@ Else
 							hidden [Object[]] GetModelWebResponse($modelGUID)
 							{
 								$DownloadURL = "https://pcsupport.lenovo.com/us/en/api/v4/downloads/drivers?productId=$($modelGUID)"						
-								$SelectedModelwebReq = Invoke-WebRequest -Uri $DownloadURL -Headers @{
+								$SelectedModelwebReq = Invoke-WebRequest -Uri $DownloadURL -UseBasicParsing -Headers @{
 								}
 								$SelectedModelWebResponse = ($SelectedModelwebReq.Content | ConvertFrom-Json)   
 								return $SelectedModelWebResponse
